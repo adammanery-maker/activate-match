@@ -14,7 +14,12 @@ Then in GitHub:
 3. Choose main and /(root)
 4. Save
 
-Game logic is in index.html.
+Current exported rules:
+- 180-second timer
+- Score = (5000 × timeRemaining ÷ 120) − (250 − (50 × livesLost))
+- Solved matches remain as blank placeholder circles on the board
+
+Main game logic is in index.html.
 Search for:
 - TOTAL_TIME
 - TOTAL_LIVES

@@ -36,8 +36,9 @@
     .empty{border:1px dashed rgba(255,255,255,.10);background:rgba(0,0,0,.12);border-radius:22px;padding:24px;text-align:center;color:var(--muted-2);font-size:14px}
     ol{margin:14px 0 0;padding-left:18px;color:var(--muted)}li{margin:0 0 9px;line-height:1.55}.section-content{display:grid;gap:14px;justify-items:center}
     .circle-btn{background:transparent;padding:0;border-radius:999px;width:64px;height:64px;display:grid;place-items:center;transition:transform .08s ease,box-shadow .08s ease}
-    .circle-btn:active{transform:scale(.97)}.circle-btn:disabled{opacity:1}.circle,.hidden-ring,.circle-space{width:64px;height:64px}.circle,.hidden-ring{border-radius:50%}@media (min-width:640px){.circle-btn,.circle,.hidden-ring,.circle-space{width:80px;height:80px}}
+    .circle-btn:active{transform:scale(.97)}.circle-btn:disabled{opacity:1}.circle,.hidden-ring,.blank-ring{width:64px;height:64px}.circle,.hidden-ring,.blank-ring{border-radius:50%}@media (min-width:640px){.circle-btn,.circle,.hidden-ring,.blank-ring{width:80px;height:80px}}
     .hidden-ring{border:1px solid var(--hidden-border);background:var(--hidden-bg);position:relative}.hidden-ring::after{content:"";position:absolute;inset:36%;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.10)}
+    .blank-ring{position:relative;border:1px dashed rgba(255,255,255,.25);background:rgba(255,255,255,.04)}.blank-ring::after{content:"";position:absolute;inset:36%;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.03)}
     .circle{position:relative}.ring-outer,.ring-middle,.ring-inner{position:absolute;border-radius:50%}.ring-outer{inset:0;border:1px solid rgba(0,0,0,.18);box-shadow:0 10px 20px rgba(0,0,0,.22)}.ring-middle{inset:18%;border:1px solid rgba(0,0,0,.16)}.ring-inner{inset:36%;border:1px solid rgba(0,0,0,.12)}
     .mono{font-variant-numeric:tabular-nums}.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
   </style>
@@ -50,7 +51,7 @@
           <div class="header-flex">
             <div>
               <h1>Memory Rings</h1>
-              <p class="subtext">28 circles. 14 matching triple-colour patterns. You have 120 seconds, five lives, and solved pairs stay cleared after a reset.</p>
+              <p class="subtext">28 circles. 14 matching triple-colour patterns. You have 180 seconds, five lives, and solved pairs stay cleared after a reset.</p>
             </div>
             <div class="button-row">
               <button id="startButton" class="button-primary">Start Game</button>
@@ -64,9 +65,9 @@
         <section class="card">
           <div class="stats-grid">
             <div class="stat"><div class="label">Lives</div><div id="lives" class="hearts"></div></div>
-            <div class="stat"><div class="label">Time</div><div id="timeValue" class="value mono">2:00</div></div>
+            <div class="stat"><div class="label">Time</div><div id="timeValue" class="value mono">3:00</div></div>
             <div class="stat"><div class="label">Pairs Found</div><div id="pairsValue" class="value mono">0/14</div></div>
-            <div class="stat"><div class="label">Score</div><div id="scoreValue" class="value mono">1000</div></div>
+            <div class="stat"><div class="label">Score</div><div id="scoreValue" class="value mono">7250</div></div>
           </div>
           <div class="progress-wrap">
             <div class="progress-head tiny-label"><span>Timer</span><span id="timerPercent">100%</span></div>
@@ -85,11 +86,11 @@
           <div class="panel-body">
             <div class="panel-title tiny-label">Rules</div>
             <ol>
-              <li>Press Start Game to reveal the board and begin the 120-second timer.</li>
+              <li>Press Start Game to reveal the board and begin the 180-second timer.</li>
               <li>Study the visible circles in preview mode, then click one circle to choose your target.</li>
               <li>The remaining unsolved circles hide immediately, and you must find the match from memory.</li>
               <li>A wrong match costs one life and resets only the unsolved part of the board while the timer keeps running.</li>
-              <li>Score = (1000 × timeRemaining ÷ 120) − (50 × livesLost).</li>
+              <li>Score = (5000 × timeRemaining ÷ 120) − (250 − (50 × livesLost)).</li>
             </ol>
           </div>
         </section>
@@ -105,91 +106,404 @@
     ];
     const SECTION_SIZES = [4, 6, 4];
     const TOTAL_LIVES = 5;
-    const TOTAL_TIME = 120;
+    const TOTAL_TIME = 180;
     const HIGH_SCORE_KEY = "memory-rings-high-scores";
     const HIGH_SCORE_LIMIT = 5;
-    const state = {deck:[],phase:"ready",matchedIds:new Set(),selectedIndex:null,lives:TOTAL_LIVES,timeRemaining:TOTAL_TIME,message:"Press Start Game to reveal the board and begin the 120-second timer.",finalScore:null,highScores:[],deadline:null,timerId:null};
-    const boardEl = document.getElementById("board"), livesEl = document.getElementById("lives"), timeValueEl = document.getElementById("timeValue"), pairsValueEl = document.getElementById("pairsValue"), scoreValueEl = document.getElementById("scoreValue"), messageEl = document.getElementById("message"), targetBoxEl = document.getElementById("targetBox"), scoreListEl = document.getElementById("scoreList"), progressBarEl = document.getElementById("progressBar"), timerPercentEl = document.getElementById("timerPercent"), startButtonEl = document.getElementById("startButton"), newButtonEl = document.getElementById("newButton"), clearScoresButtonEl = document.getElementById("clearScoresButton");
-    function shuffle(array){const copy=[...array];for(let i=copy.length-1;i>0;i-=1){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]}return copy}
-    function buildDeck(){return shuffle(PATTERNS.flatMap((colors,pairId)=>[{id:`${pairId}-a`,pairId,colors},{id:`${pairId}-b`,pairId,colors}]))}
-    function formatTime(seconds){const mins=Math.floor(seconds/60), secs=seconds%60; return `${mins}:${String(secs).padStart(2,"0")}`}
-    function computeScore(timeRemaining=state.timeRemaining,lives=state.lives){const livesLost=TOTAL_LIVES-lives;return Math.round((1000*timeRemaining/TOTAL_TIME)-(50*livesLost))}
-    function loadHighScores(){try{const raw=localStorage.getItem(HIGH_SCORE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[]}catch{return[]}}
-    function saveHighScores(scores){try{localStorage.setItem(HIGH_SCORE_KEY,JSON.stringify(scores))}catch{}}
-    function getSectionIndices(){let cursor=0;return SECTION_SIZES.map((size,index)=>({title:`Section ${index+1}`,top:Array.from({length:size},()=>cursor++),bottom:Array.from({length:size},()=>cursor++)}))}
-    function createCircle(colors){const circle=document.createElement("div");circle.className="circle";const outer=document.createElement("div"),middle=document.createElement("div"),inner=document.createElement("div");outer.className="ring-outer";middle.className="ring-middle";inner.className="ring-inner";outer.style.backgroundColor=colors[0];middle.style.backgroundColor=colors[1];inner.style.backgroundColor=colors[2];circle.append(outer,middle,inner);return circle}
-    function createHiddenRing(selected){const hidden=document.createElement("div");hidden.className="hidden-ring";if(selected){hidden.style.borderColor="rgba(255,255,255,.72)";hidden.style.boxShadow="0 0 0 3px rgba(255,255,255,.08)"}return hidden}
-    function stopTimer(){if(state.timerId){clearInterval(state.timerId);state.timerId=null}}
-    function startTimer(){stopTimer();state.deadline=Date.now()+(state.timeRemaining*1000);state.timerId=setInterval(()=>{const next=Math.max(0,Math.ceil((state.deadline-Date.now())/1000));if(next!==state.timeRemaining){state.timeRemaining=next;updateStats()}if(next<=0){stopTimer();if(state.phase==="preview"||state.phase==="playing"){state.timeRemaining=0;state.finalScore=computeScore(0,state.lives);state.phase="lost";state.selectedIndex=null;state.message="Time's up. Start a new game to try again.";saveResultIfNeeded();render()}}},250)}
-    function resetRunState(nextDeck){stopTimer();state.deck=nextDeck;state.phase="ready";state.matchedIds=new Set();state.selectedIndex=null;state.lives=TOTAL_LIVES;state.timeRemaining=TOTAL_TIME;state.message="Press Start Game to reveal the board and begin the 120-second timer.";state.finalScore=null;state.deadline=null}
-    function saveResultIfNeeded(){if(state.finalScore===null||(state.phase!=="won"&&state.phase!=="lost")) return; const candidate={score:state.finalScore,result:state.phase==="won"?"Win":"Loss",livesLost:TOTAL_LIVES-state.lives,timeRemaining:state.timeRemaining,timestamp:Date.now()};const exists=state.highScores.some(entry=>entry.score===candidate.score&&entry.result===candidate.result&&entry.livesLost===candidate.livesLost&&entry.timeRemaining===candidate.timeRemaining&&Math.abs(entry.timestamp-candidate.timestamp)<1000); if(exists)return; state.highScores=[...state.highScores,candidate].sort((a,b)=>(b.score-a.score)||(b.timeRemaining-a.timeRemaining)).slice(0,HIGH_SCORE_LIMIT); saveHighScores(state.highScores)}
-    function startGame(){resetRunState(buildDeck());state.phase="preview";state.message="Board revealed. Memorize the patterns, then click any circle to choose your target.";startTimer();render()}
-    function newGame(){resetRunState(buildDeck());render()}
-    function clearHighScores(){state.highScores=[];saveHighScores([]);renderHighScores()}
-    function handleCircleClick(deckIndex){
-      const clicked=state.deck[deckIndex]; if(!clicked||state.matchedIds.has(clicked.id)||state.phase==="ready"||state.phase==="won"||state.phase==="lost") return;
-      if(state.phase==="preview"){state.phase="playing";state.selectedIndex=deckIndex;state.message="Now match that pattern from memory.";render();return}
-      if(state.selectedIndex===null){state.selectedIndex=deckIndex;state.message="Find the matching circle.";render();return}
-      if(deckIndex===state.selectedIndex) return;
-      const selected=state.deck[state.selectedIndex], isMatch=selected.pairId===clicked.pairId;
-      if(isMatch){
-        state.matchedIds.add(selected.id); state.matchedIds.add(clicked.id); state.selectedIndex=null;
-        if(state.matchedIds.size===state.deck.length){stopTimer();state.finalScore=computeScore();state.phase="won";state.message="Perfect memory. You matched all 14 pairs.";saveResultIfNeeded()} else {state.message="Match found. Pick another hidden circle."}
-        render(); return;
+    const state = {
+      deck: [],
+      phase: "ready",
+      matchedIds: new Set(),
+      selectedIndex: null,
+      lives: TOTAL_LIVES,
+      timeRemaining: TOTAL_TIME,
+      message: "Press Start Game to reveal the board and begin the 180-second timer.",
+      finalScore: null,
+      highScores: [],
+      deadline: null,
+      timerId: null,
+    };
+
+    const boardEl = document.getElementById("board");
+    const livesEl = document.getElementById("lives");
+    const timeValueEl = document.getElementById("timeValue");
+    const pairsValueEl = document.getElementById("pairsValue");
+    const scoreValueEl = document.getElementById("scoreValue");
+    const messageEl = document.getElementById("message");
+    const targetBoxEl = document.getElementById("targetBox");
+    const scoreListEl = document.getElementById("scoreList");
+    const progressBarEl = document.getElementById("progressBar");
+    const timerPercentEl = document.getElementById("timerPercent");
+    const startButtonEl = document.getElementById("startButton");
+    const newButtonEl = document.getElementById("newButton");
+    const clearScoresButtonEl = document.getElementById("clearScoresButton");
+
+    function shuffle(array){
+      const copy=[...array];
+      for(let i=copy.length-1;i>0;i-=1){
+        const j=Math.floor(Math.random()*(i+1));
+        [copy[i],copy[j]]=[copy[j],copy[i]];
       }
-      state.lives-=1; state.selectedIndex=null;
-      if(state.lives>0){state.phase="preview";state.message="Wrong match. The board reset, but your completed matches stay cleared. The timer is still running."}
-      else {stopTimer();state.finalScore=computeScore(state.timeRemaining,state.lives);state.phase="lost";state.message="No lives left. Start a new game to try again.";saveResultIfNeeded()}
+      return copy;
+    }
+
+    function buildDeck(){
+      const duplicated = PATTERNS.flatMap((colors,pairId)=>[
+        {id:`${pairId}-a`,pairId,colors},
+        {id:`${pairId}-b`,pairId,colors},
+      ]);
+      return shuffle(duplicated);
+    }
+
+    function formatTime(seconds){
+      const mins=Math.floor(seconds/60);
+      const secs=seconds%60;
+      return `${mins}:${String(secs).padStart(2,"0")}`;
+    }
+
+    function computeScore(timeRemaining=state.timeRemaining,lives=state.lives){
+      const livesLost = TOTAL_LIVES - lives;
+      return Math.round((5000 * timeRemaining / 120) - (250 - (50 * livesLost)));
+    }
+
+    function loadHighScores(){
+      try{
+        const raw = localStorage.getItem(HIGH_SCORE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      }catch{return []}
+    }
+
+    function saveHighScores(scores){
+      try{ localStorage.setItem(HIGH_SCORE_KEY, JSON.stringify(scores)); }catch{}
+    }
+
+    function getSectionIndices(){
+      let cursor = 0;
+      return SECTION_SIZES.map((size, index) => ({
+        title: `Section ${index + 1}`,
+        top: Array.from({length:size}, ()=>cursor++),
+        bottom: Array.from({length:size}, ()=>cursor++),
+      }));
+    }
+
+    function createCircle(colors){
+      const circle = document.createElement("div");
+      circle.className = "circle";
+      const outer = document.createElement("div");
+      const middle = document.createElement("div");
+      const inner = document.createElement("div");
+      outer.className = "ring-outer";
+      middle.className = "ring-middle";
+      inner.className = "ring-inner";
+      outer.style.backgroundColor = colors[0];
+      middle.style.backgroundColor = colors[1];
+      inner.style.backgroundColor = colors[2];
+      circle.append(outer,middle,inner);
+      return circle;
+    }
+
+    function createHiddenRing(selected){
+      const hidden = document.createElement("div");
+      hidden.className = "hidden-ring";
+      if(selected){
+        hidden.style.borderColor = "rgba(255,255,255,.72)";
+        hidden.style.boxShadow = "0 0 0 3px rgba(255,255,255,.08)";
+      }
+      return hidden;
+    }
+
+    function createBlankRing(){
+      const blank = document.createElement("div");
+      blank.className = "blank-ring";
+      return blank;
+    }
+
+    function stopTimer(){
+      if(state.timerId){
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+    }
+
+    function startTimer(){
+      stopTimer();
+      state.deadline = Date.now() + (state.timeRemaining * 1000);
+      state.timerId = setInterval(() => {
+        const next = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
+        if(next !== state.timeRemaining){
+          state.timeRemaining = next;
+          updateStats();
+        }
+        if(next <= 0){
+          stopTimer();
+          if(state.phase === "preview" || state.phase === "playing"){
+            state.timeRemaining = 0;
+            state.finalScore = computeScore(0, state.lives);
+            state.phase = "lost";
+            state.selectedIndex = null;
+            state.message = "Time's up. Start a new game to try again.";
+            saveResultIfNeeded();
+            render();
+          }
+        }
+      }, 250);
+    }
+
+    function resetRunState(nextDeck){
+      stopTimer();
+      state.deck = nextDeck;
+      state.phase = "ready";
+      state.matchedIds = new Set();
+      state.selectedIndex = null;
+      state.lives = TOTAL_LIVES;
+      state.timeRemaining = TOTAL_TIME;
+      state.message = "Press Start Game to reveal the board and begin the 180-second timer.";
+      state.finalScore = null;
+      state.deadline = null;
+    }
+
+    function saveResultIfNeeded(){
+      if(state.finalScore === null || (state.phase !== "won" && state.phase !== "lost")) return;
+      const candidate = {
+        score: state.finalScore,
+        result: state.phase === "won" ? "Win" : "Loss",
+        livesLost: TOTAL_LIVES - state.lives,
+        timeRemaining: state.timeRemaining,
+        timestamp: Date.now(),
+      };
+      const exists = state.highScores.some((entry) =>
+        entry.score === candidate.score &&
+        entry.result === candidate.result &&
+        entry.livesLost === candidate.livesLost &&
+        entry.timeRemaining === candidate.timeRemaining &&
+        Math.abs(entry.timestamp - candidate.timestamp) < 1000
+      );
+      if(exists) return;
+      state.highScores = [...state.highScores, candidate]
+        .sort((a,b) => (b.score - a.score) || (b.timeRemaining - a.timeRemaining))
+        .slice(0, HIGH_SCORE_LIMIT);
+      saveHighScores(state.highScores);
+    }
+
+    function startGame(){
+      resetRunState(buildDeck());
+      state.phase = "preview";
+      state.message = "Board revealed. Memorize the patterns, then click any circle to choose your target.";
+      startTimer();
       render();
     }
+
+    function newGame(){
+      resetRunState(buildDeck());
+      render();
+    }
+
+    function clearHighScores(){
+      state.highScores = [];
+      saveHighScores([]);
+      renderHighScores();
+    }
+
+    function handleCircleClick(deckIndex){
+      const clicked = state.deck[deckIndex];
+      if(!clicked || state.matchedIds.has(clicked.id) || state.phase === "ready" || state.phase === "won" || state.phase === "lost") return;
+
+      if(state.phase === "preview"){
+        state.phase = "playing";
+        state.selectedIndex = deckIndex;
+        state.message = "Now match that pattern from memory.";
+        render();
+        return;
+      }
+
+      if(state.selectedIndex === null){
+        state.selectedIndex = deckIndex;
+        state.message = "Find the matching circle.";
+        render();
+        return;
+      }
+
+      if(deckIndex === state.selectedIndex) return;
+
+      const selected = state.deck[state.selectedIndex];
+      const isMatch = selected.pairId === clicked.pairId;
+
+      if(isMatch){
+        state.matchedIds.add(selected.id);
+        state.matchedIds.add(clicked.id);
+        state.selectedIndex = null;
+
+        if(state.matchedIds.size === state.deck.length){
+          stopTimer();
+          state.finalScore = computeScore();
+          state.phase = "won";
+          state.message = "Perfect memory. You matched all 14 pairs.";
+          saveResultIfNeeded();
+        } else {
+          state.message = "Match found. Pick another hidden circle.";
+        }
+        render();
+        return;
+      }
+
+      state.lives -= 1;
+      state.selectedIndex = null;
+
+      if(state.lives > 0){
+        state.phase = "preview";
+        state.message = "Wrong match. The board reset, but your completed matches stay cleared. The timer is still running.";
+      } else {
+        stopTimer();
+        state.finalScore = computeScore(state.timeRemaining, state.lives);
+        state.phase = "lost";
+        state.message = "No lives left. Start a new game to try again.";
+        saveResultIfNeeded();
+      }
+      render();
+    }
+
     function renderBoard(){
-      boardEl.innerHTML=""; const sections=getSectionIndices();
-      sections.forEach((section,idx)=>{
-        const sectionEl=document.createElement("div"); sectionEl.className="section";
-        const title=document.createElement("div"); title.className="section-title"; title.textContent=section.title; sectionEl.appendChild(title);
-        const content=document.createElement("div"); content.className="section-content";
-        [["Top",section.top],["Bottom",section.bottom]].forEach(([rowLabel,indices])=>{
-          const rowWrap=document.createElement("div"); rowWrap.className="row-wrap";
-          const rowTitle=document.createElement("div"); rowTitle.className="tiny-label"; rowTitle.textContent=rowLabel; rowWrap.appendChild(rowTitle);
-          const row=document.createElement("div"); row.className="row"; row.style.gridTemplateColumns=`repeat(${indices.length}, minmax(0, 1fr))`;
-          indices.forEach((deckIndex)=>{
-            const card=state.deck[deckIndex], matched=state.matchedIds.has(card.id), hidden=(state.phase==="ready"||state.phase==="playing")&&!matched, selected=state.phase==="playing"&&state.selectedIndex!==null&&state.deck[state.selectedIndex].id===card.id;
-            const button=document.createElement("button"); button.className="circle-btn"+(selected?" selected":""); button.disabled=matched||state.phase==="ready"||state.phase==="won"||state.phase==="lost"; button.addEventListener("click",()=>handleCircleClick(deckIndex));
-            if(matched){const spacer=document.createElement("div"); spacer.className="circle-space"; button.appendChild(spacer)} else if(hidden){button.appendChild(createHiddenRing(selected))} else {button.appendChild(createCircle(card.colors))}
+      boardEl.innerHTML = "";
+      const sections = getSectionIndices();
+      sections.forEach((section, idx) => {
+        const sectionEl = document.createElement("div");
+        sectionEl.className = "section";
+        const title = document.createElement("div");
+        title.className = "section-title";
+        title.textContent = section.title;
+        sectionEl.appendChild(title);
+
+        const content = document.createElement("div");
+        content.className = "section-content";
+
+        [["Top", section.top], ["Bottom", section.bottom]].forEach(([rowLabel, indices]) => {
+          const rowWrap = document.createElement("div");
+          rowWrap.className = "row-wrap";
+          const rowTitle = document.createElement("div");
+          rowTitle.className = "tiny-label";
+          rowTitle.textContent = rowLabel;
+          rowWrap.appendChild(rowTitle);
+
+          const row = document.createElement("div");
+          row.className = "row";
+          row.style.gridTemplateColumns = `repeat(${indices.length}, minmax(0, 1fr))`;
+
+          indices.forEach((deckIndex) => {
+            const card = state.deck[deckIndex];
+            const matched = state.matchedIds.has(card.id);
+            const hidden = (state.phase === "ready" || state.phase === "playing") && !matched;
+            const selected = state.phase === "playing" && state.selectedIndex !== null && state.deck[state.selectedIndex].id === card.id;
+            const button = document.createElement("button");
+            button.className = "circle-btn" + (selected ? " selected" : "");
+            button.disabled = matched || state.phase === "ready" || state.phase === "won" || state.phase === "lost";
+            button.addEventListener("click", () => handleCircleClick(deckIndex));
+
+            if(matched){
+              button.appendChild(createBlankRing());
+            } else if(hidden){
+              button.appendChild(createHiddenRing(selected));
+            } else {
+              button.appendChild(createCircle(card.colors));
+            }
             row.appendChild(button);
           });
-          rowWrap.appendChild(row); content.appendChild(rowWrap);
+
+          rowWrap.appendChild(row);
+          content.appendChild(rowWrap);
         });
-        sectionEl.appendChild(content); boardEl.appendChild(sectionEl);
-        if(idx<sections.length-1){const divider=document.createElement("div"); divider.className="divider"; boardEl.appendChild(divider)}
-      })
+
+        sectionEl.appendChild(content);
+        boardEl.appendChild(sectionEl);
+        if(idx < sections.length - 1){
+          const divider = document.createElement("div");
+          divider.className = "divider";
+          boardEl.appendChild(divider);
+        }
+      });
     }
-    function renderLives(){livesEl.innerHTML=""; for(let i=0;i<TOTAL_LIVES;i+=1){const heart=document.createElement("div"); heart.className="heart"+(i<state.lives?" active":""); heart.textContent="♥"; heart.style.color=i<state.lives?"var(--danger)":"rgba(255,255,255,.20)"; livesEl.appendChild(heart)}}
+
+    function renderLives(){
+      livesEl.innerHTML = "";
+      for(let i=0; i<TOTAL_LIVES; i+=1){
+        const heart = document.createElement("div");
+        heart.className = "heart" + (i < state.lives ? " active" : "");
+        heart.textContent = "♥";
+        heart.style.color = i < state.lives ? "var(--danger)" : "rgba(255,255,255,.20)";
+        livesEl.appendChild(heart);
+      }
+    }
+
     function renderTarget(){
-      targetBoxEl.innerHTML="";
-      if(state.phase==="playing"&&state.selectedIndex!==null){targetBoxEl.appendChild(createCircle(state.deck[state.selectedIndex].colors)); return}
-      const wrap=document.createElement("div");
-      wrap.innerHTML = state.phase==="won" ? `<div class="big">All matched</div><div class="small">Final score: ${state.finalScore}</div>` :
-                       state.phase==="lost" ? `<div class="big">Run over</div><div class="small">Final score: ${state.finalScore}</div>` :
-                       state.phase==="preview" ? `<div class="big">Preview mode</div><div class="small">Memorize the board, then click any circle to choose your target.</div>` :
-                       `<div class="big">Ready to start</div><div class="small">Press Start Game to reveal the board and begin the timer.</div>`;
+      targetBoxEl.innerHTML = "";
+      if(state.phase === "playing" && state.selectedIndex !== null){
+        targetBoxEl.appendChild(createCircle(state.deck[state.selectedIndex].colors));
+        return;
+      }
+      const wrap = document.createElement("div");
+      wrap.innerHTML = state.phase === "won"
+        ? `<div class="big">All matched</div><div class="small">Final score: ${state.finalScore}</div>`
+        : state.phase === "lost"
+        ? `<div class="big">Run over</div><div class="small">Final score: ${state.finalScore}</div>`
+        : state.phase === "preview"
+        ? `<div class="big">Preview mode</div><div class="small">Memorize the board, then click any circle to choose your target.</div>`
+        : `<div class="big">Ready to start</div><div class="small">Press Start Game to reveal the board and begin the timer.</div>`;
       targetBoxEl.appendChild(wrap);
     }
+
     function renderHighScores(){
-      scoreListEl.innerHTML="";
-      if(!state.highScores.length){const empty=document.createElement("div"); empty.className="empty"; empty.textContent="No high scores yet."; scoreListEl.appendChild(empty); return}
-      const list=document.createElement("div"); list.className="score-list";
-      state.highScores.forEach((entry,index)=>{const row=document.createElement("div"); row.className="score-row"; row.innerHTML=`<div style="display:flex;align-items:center;gap:12px"><div class="score-rank mono">${index+1}</div><div><div class="score-main mono">${entry.score}</div><div class="score-sub">${entry.result} • ${formatTime(entry.timeRemaining)} left • ${entry.livesLost} lives lost</div></div></div>`; list.appendChild(row)});
+      scoreListEl.innerHTML = "";
+      if(!state.highScores.length){
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No high scores yet.";
+        scoreListEl.appendChild(empty);
+        return;
+      }
+      const list = document.createElement("div");
+      list.className = "score-list";
+      state.highScores.forEach((entry, index) => {
+        const row = document.createElement("div");
+        row.className = "score-row";
+        row.innerHTML = `<div style="display:flex;align-items:center;gap:12px"><div class="score-rank mono">${index + 1}</div><div><div class="score-main mono">${entry.score}</div><div class="score-sub">${entry.result} • ${formatTime(entry.timeRemaining)} left • ${entry.livesLost} lives lost</div></div></div>`;
+        list.appendChild(row);
+      });
       scoreListEl.appendChild(list);
     }
+
     function updateStats(){
-      const pairsFound=state.matchedIds.size/2, displayedScore=state.finalScore ?? computeScore(), timerProgress=Math.max(0,Math.min(100,(state.timeRemaining/TOTAL_TIME)*100));
-      renderLives(); timeValueEl.textContent=formatTime(state.timeRemaining); pairsValueEl.textContent=`${pairsFound}/14`; scoreValueEl.textContent=displayedScore; messageEl.textContent=state.message; progressBarEl.style.width=`${timerProgress}%`; timerPercentEl.textContent=`${Math.round(timerProgress)}%`; startButtonEl.disabled=state.phase==="preview"||state.phase==="playing";
+      const pairsFound = state.matchedIds.size / 2;
+      const displayedScore = state.finalScore ?? computeScore();
+      const timerProgress = Math.max(0, Math.min(100, (state.timeRemaining / TOTAL_TIME) * 100));
+      renderLives();
+      timeValueEl.textContent = formatTime(state.timeRemaining);
+      pairsValueEl.textContent = `${pairsFound}/14`;
+      scoreValueEl.textContent = displayedScore;
+      messageEl.textContent = state.message;
+      progressBarEl.style.width = `${timerProgress}%`;
+      timerPercentEl.textContent = `${Math.round(timerProgress)}%`;
+      startButtonEl.disabled = state.phase === "preview" || state.phase === "playing";
     }
-    function render(){updateStats(); renderBoard(); renderTarget(); renderHighScores()}
-    startButtonEl.addEventListener("click",startGame); newButtonEl.addEventListener("click",newGame); clearScoresButtonEl.addEventListener("click",clearHighScores);
-    state.highScores=loadHighScores(); resetRunState(buildDeck()); render();
-    if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("./sw.js").catch(()=>{})})}
+
+    function render(){
+      updateStats();
+      renderBoard();
+      renderTarget();
+      renderHighScores();
+    }
+
+    startButtonEl.addEventListener("click", startGame);
+    newButtonEl.addEventListener("click", newGame);
+    clearScoresButtonEl.addEventListener("click", clearHighScores);
+
+    state.highScores = loadHighScores();
+    resetRunState(buildDeck());
+    render();
+
+    if("serviceWorker" in navigator){
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
   </script>
 </body>
 </html>
