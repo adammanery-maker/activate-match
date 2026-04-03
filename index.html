@@ -1,383 +1,195 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Memory Rings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#020617">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Memory Rings">
+  <meta name="description" content="A memory matching game with triple-colour rings, a live timer, score, and local high scores.">
+  <title>Memory Rings</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-180.png">
   <style>
-    :root{
-      --bg:#020617;
-      --panel:rgba(255,255,255,.06);
-      --panel-2:rgba(255,255,255,.04);
-      --line:rgba(255,255,255,.10);
-      --text:#f8fafc;
-      --muted:rgba(248,250,252,.68);
-      --muted-2:rgba(248,250,252,.45);
-      --accent:rgba(255,255,255,.14);
-      --danger:#ef4444;
-      --safe-top:env(safe-area-inset-top,0px);
-      --safe-bottom:env(safe-area-inset-bottom,0px);
-    }
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-    body{min-height:100dvh}
-    .app{max-width:980px;margin:0 auto;padding:calc(14px + var(--safe-top)) 12px calc(20px + var(--safe-bottom))}
-    .stack{display:grid;gap:14px}
-    .panel{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:22px;
-      backdrop-filter:blur(10px);
-      box-shadow:0 10px 30px rgba(0,0,0,.18);
-    }
-    .header{padding:18px}
-    .title-row{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
-    h1{margin:0;font-size:clamp(28px,6vw,42px);line-height:1.05}
-    .subtitle{margin:8px 0 0;color:var(--muted);font-size:14px;line-height:1.55;max-width:54ch}
-    .btn{
-      appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);
-      padding:12px 14px;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer
-    }
-    .btn:active{transform:scale(.98)}
-    .top-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .stat-card{padding:14px 16px}
-    .label{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px}
-    .value-big{font-size:30px;font-weight:700}
-    .hearts{display:flex;gap:8px;align-items:center;min-height:36px}
-    .heart{font-size:24px;line-height:1;filter:drop-shadow(0 2px 8px rgba(239,68,68,.15))}
-    .heart.off{opacity:.22;filter:none}
-    .status, .target, .rules{padding:16px}
-    .status-text{margin:6px 0 0;color:var(--muted);line-height:1.55;font-size:15px}
-    .target-box{
-      min-height:112px;border-radius:20px;border:1px solid var(--line);background:rgba(0,0,0,.18);
-      display:flex;align-items:center;justify-content:center;padding:12px;text-align:center;color:var(--muted)
-    }
-    .rules ol{margin:8px 0 0 18px;padding:0;color:var(--muted);line-height:1.55;font-size:14px}
-    .rules li+li{margin-top:6px}
-    .board{padding:14px}
-    .section{padding:14px;border-radius:20px;border:1px solid var(--line);background:var(--panel-2)}
-    .section + .divider{height:1px;background:linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);margin:6px 0}
-    .section-title,.row-label{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted-2);text-align:center}
-    .row-label{margin-bottom:8px}
-    .rows{display:grid;gap:14px;margin-top:10px}
-    .circle-grid{display:grid;gap:10px;justify-content:center}
-    .circle-btn{
-      appearance:none;border:0;background:none;padding:0;cursor:pointer;border-radius:999px;
-      min-width:60px;min-height:60px;display:flex;align-items:center;justify-content:center
-    }
-    .circle-btn:disabled{cursor:default}
-    .circle-btn:active .ring{transform:scale(.97)}
-    .ring{position:relative;width:60px;height:60px;border-radius:999px;transition:transform .12s ease}
-    .outer,.mid,.inner{
-      position:absolute;border-radius:999px;border:1px solid rgba(0,0,0,.12)
-    }
-    .outer{inset:0;box-shadow:0 10px 20px rgba(0,0,0,.16)}
-    .mid{inset:18%}
-    .inner{inset:36%}
-    .hidden-ring{
-      width:60px;height:60px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);
-      display:flex;align-items:center;justify-content:center
-    }
-    .hidden-ring.selected{border-color:rgba(255,255,255,.72);background:rgba(255,255,255,.12);box-shadow:0 0 0 3px rgba(255,255,255,.08)}
-    .hidden-ring::after{
-      content:"";width:24px;height:24px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08)
-    }
-    .removed{width:60px;height:60px}
-    .footer-note{padding:0 4px;color:var(--muted-2);font-size:12px;line-height:1.45;text-align:center}
-    @media (min-width:720px){
-      .app{padding-left:18px;padding-right:18px}
-      .desktop-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,.9fr);gap:16px;align-items:start}
-      .board{padding:16px}
-      .section{padding:16px}
-      .circle-grid{gap:12px}
-      .circle-btn,.ring,.hidden-ring,.removed{min-width:72px;min-height:72px;width:72px;height:72px}
-      .hidden-ring::after{width:28px;height:28px}
-    }
+    :root{--bg:#020617;--panel:rgba(255,255,255,.06);--panel-border:rgba(255,255,255,.10);--text:#f8fafc;--muted:rgba(248,250,252,.68);--muted-2:rgba(248,250,252,.45);--hidden-bg:rgba(255,255,255,.08);--hidden-border:rgba(255,255,255,.20);--accent:#10b981;--danger:#ef4444}
+    *{box-sizing:border-box} html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif} body{min-height:100vh}
+    .wrap{max-width:1280px;margin:0 auto;padding:16px}.layout{display:grid;gap:24px}@media (min-width:1000px){.layout{grid-template-columns:minmax(0,1.55fr) minmax(320px,.85fr)}.wrap{padding:24px}}
+    .card{background:var(--panel);border:1px solid var(--panel-border);border-radius:28px;overflow:hidden;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .header{padding:22px 22px 12px}.header-flex{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+    h1{margin:0;font-size:clamp(28px,4vw,40px);line-height:1.05}.subtext{margin:10px 0 0;color:var(--muted);max-width:760px;font-size:15px;line-height:1.55}
+    .button-row{display:flex;gap:12px;flex-wrap:wrap}
+    button{appearance:none;border:0;border-radius:16px;padding:12px 16px;font-size:15px;font-weight:700;color:white;background:rgba(255,255,255,.08);cursor:pointer}
+    button:hover{filter:brightness(1.08)}button:disabled{opacity:.45;cursor:not-allowed}.button-primary{background:var(--accent);color:#052e16}.button-secondary{background:rgba(255,255,255,.10);color:var(--text)}
+    .board{padding:12px 16px 20px;display:grid;gap:18px}.section{border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.12);border-radius:28px;padding:14px}
+    .section-title,.label,.tiny-label{text-transform:uppercase;letter-spacing:.24em;color:var(--muted-2)}.section-title{font-size:12px;text-align:center;margin-bottom:14px}.tiny-label{font-size:10px;text-align:center;margin-bottom:8px}
+    .row{display:grid;gap:10px;justify-content:center}.row-wrap{display:grid;gap:12px}.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent)}
+    .sidebar{display:grid;gap:18px}.stats-grid{display:grid;gap:18px;padding:18px}@media (min-width:520px){.stats-grid{grid-template-columns:1fr 1fr}}
+    .stat .label{font-size:11px}.stat .value{margin-top:8px;font-size:36px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+    .hearts{display:flex;gap:8px;margin-top:10px}.heart{font-size:22px;line-height:1;opacity:.22}.heart.active{opacity:1}
+    .progress-wrap{padding:0 18px 18px}.progress-head{display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-bottom:8px}.progress-track{height:10px;border-radius:999px;background:rgba(255,255,255,.10);overflow:hidden}.progress-bar{height:100%;border-radius:999px;background:rgba(255,255,255,.72);transition:width .18s linear}
+    .panel-body{padding:18px}.panel-title{display:flex;align-items:center;gap:8px;font-size:11px}.message{margin:12px 0 0;font-size:15px;line-height:1.6;color:var(--muted)}
+    .target-box{min-height:140px;margin-top:14px;border-radius:28px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;padding:16px;text-align:center}
+    .target-box .big{font-size:20px;font-weight:700}.target-box .small{margin-top:6px;font-size:14px;color:var(--muted-2)}
+    .score-list{display:grid;gap:8px}.score-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.18)}
+    .score-rank{width:24px;color:var(--muted-2);font-variant-numeric:tabular-nums}.score-main{font-weight:700}.score-sub{font-size:12px;color:var(--muted-2);margin-top:2px}
+    .empty{border:1px dashed rgba(255,255,255,.10);background:rgba(0,0,0,.12);border-radius:22px;padding:24px;text-align:center;color:var(--muted-2);font-size:14px}
+    ol{margin:14px 0 0;padding-left:18px;color:var(--muted)}li{margin:0 0 9px;line-height:1.55}.section-content{display:grid;gap:14px;justify-items:center}
+    .circle-btn{background:transparent;padding:0;border-radius:999px;width:64px;height:64px;display:grid;place-items:center;transition:transform .08s ease,box-shadow .08s ease}
+    .circle-btn:active{transform:scale(.97)}.circle-btn:disabled{opacity:1}.circle,.hidden-ring,.circle-space{width:64px;height:64px}.circle,.hidden-ring{border-radius:50%}@media (min-width:640px){.circle-btn,.circle,.hidden-ring,.circle-space{width:80px;height:80px}}
+    .hidden-ring{border:1px solid var(--hidden-border);background:var(--hidden-bg);position:relative}.hidden-ring::after{content:"";position:absolute;inset:36%;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.10)}
+    .circle{position:relative}.ring-outer,.ring-middle,.ring-inner{position:absolute;border-radius:50%}.ring-outer{inset:0;border:1px solid rgba(0,0,0,.18);box-shadow:0 10px 20px rgba(0,0,0,.22)}.ring-middle{inset:18%;border:1px solid rgba(0,0,0,.16)}.ring-inner{inset:36%;border:1px solid rgba(0,0,0,.12)}
+    .mono{font-variant-numeric:tabular-nums}.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
   </style>
 </head>
 <body>
-  <div class="app stack">
-    <div class="panel header">
-      <div class="title-row">
-        <div>
-          <h1>Memory Rings</h1>
-          <p class="subtitle">28 circles. 14 matching triple-colour patterns. Solved pairs stay cleared after a reset. You have five lives.</p>
-        </div>
-        <button id="newGameBtn" class="btn">New Game</button>
-      </div>
-    </div>
-
-    <div class="desktop-layout">
-      <div class="panel board" id="board"></div>
-
-      <div class="stack">
-        <div class="top-stats">
-          <div class="panel stat-card">
-            <div class="label">Lives</div>
-            <div class="hearts" id="hearts"></div>
-          </div>
-          <div class="panel stat-card" style="text-align:right">
-            <div class="label">Pairs Found</div>
-            <div class="value-big"><span id="pairsFound">0</span>/14</div>
+  <div class="wrap">
+    <div class="layout">
+      <section class="card">
+        <div class="header">
+          <div class="header-flex">
+            <div>
+              <h1>Memory Rings</h1>
+              <p class="subtext">28 circles. 14 matching triple-colour patterns. You have 120 seconds, five lives, and solved pairs stay cleared after a reset.</p>
+            </div>
+            <div class="button-row">
+              <button id="startButton" class="button-primary">Start Game</button>
+              <button id="newButton" class="button-secondary">New Game</button>
+            </div>
           </div>
         </div>
-
-        <div class="panel status">
-          <div class="label">Status</div>
-          <p class="status-text" id="statusText"></p>
-        </div>
-
-        <div class="panel target">
-          <div class="label">Current Target</div>
-          <div class="target-box" id="targetBox"></div>
-        </div>
-
-        <div class="panel rules">
-          <div class="label">Rules</div>
-          <ol>
-            <li>Study the visible circles while the board is in preview mode.</li>
-            <li>Tap one circle to begin. The remaining unsolved circles hide immediately.</li>
-            <li>Use the target preview to remember which hidden match to find.</li>
-            <li>A wrong match costs one life and resets only the unsolved part of the board.</li>
-            <li>Solved pairs stay removed. Clear all 14 pairs before your five lives run out.</li>
-          </ol>
-        </div>
-      </div>
+        <div id="board" class="board"></div>
+      </section>
+      <aside class="sidebar">
+        <section class="card">
+          <div class="stats-grid">
+            <div class="stat"><div class="label">Lives</div><div id="lives" class="hearts"></div></div>
+            <div class="stat"><div class="label">Time</div><div id="timeValue" class="value mono">2:00</div></div>
+            <div class="stat"><div class="label">Pairs Found</div><div id="pairsValue" class="value mono">0/14</div></div>
+            <div class="stat"><div class="label">Score</div><div id="scoreValue" class="value mono">1000</div></div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-head tiny-label"><span>Timer</span><span id="timerPercent">100%</span></div>
+            <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          </div>
+        </section>
+        <section class="card"><div class="panel-body"><div class="panel-title tiny-label">Status</div><p id="message" class="message"></p></div></section>
+        <section class="card"><div class="panel-body"><div class="panel-title tiny-label">Current Target</div><div id="targetBox" class="target-box"></div></div></section>
+        <section class="card">
+          <div class="panel-body">
+            <div class="topline"><div class="panel-title tiny-label">High Scores</div><button id="clearScoresButton" class="button-secondary" style="padding:8px 12px;font-size:12px">Clear</button></div>
+            <div id="scoreList"></div>
+          </div>
+        </section>
+        <section class="card">
+          <div class="panel-body">
+            <div class="panel-title tiny-label">Rules</div>
+            <ol>
+              <li>Press Start Game to reveal the board and begin the 120-second timer.</li>
+              <li>Study the visible circles in preview mode, then click one circle to choose your target.</li>
+              <li>The remaining unsolved circles hide immediately, and you must find the match from memory.</li>
+              <li>A wrong match costs one life and resets only the unsolved part of the board while the timer keeps running.</li>
+              <li>Score = (1000 × timeRemaining ÷ 120) − (50 × livesLost).</li>
+            </ol>
+          </div>
+        </section>
+      </aside>
     </div>
-
-    <div class="footer-note">Phone-friendly version. Open it in Safari or Chrome, or host the full package and add it to your home screen.</div>
   </div>
-
   <script>
     const PATTERNS = [
-      ["#ef4444", "#3b82f6", "#fde68a"],
-      ["#22c55e", "#a855f7", "#f97316"],
-      ["#0ea5e9", "#ec4899", "#84cc16"],
-      ["#f59e0b", "#6366f1", "#99f6e4"],
-      ["#10b981", "#f43f5e", "#ddd6fe"],
-      ["#eab308", "#14b8a6", "#fecdd3"],
-      ["#8b5cf6", "#22c55e", "#fdba74"],
-      ["#06b6d4", "#be123c", "#fef08a"],
-      ["#ca8a04", "#4338ca", "#a7f3d0"],
-      ["#f97316", "#0f766e", "#c7d2fe"],
-      ["#3b82f6", "#84cc16", "#fbcfe8"],
-      ["#ec4899", "#0369a1", "#d9f99d"],
-      ["#ef4444", "#10b981", "#e9d5ff"],
-      ["#7c3aed", "#eab308", "#bae6fd"],
+      ["#ef4444", "#3b82f6", "#fde68a"],["#22c55e", "#a855f7", "#f97316"],["#0ea5e9", "#ec4899", "#84cc16"],["#f59e0b", "#6366f1", "#99f6e4"],
+      ["#10b981", "#f43f5e", "#ddd6fe"],["#eab308", "#14b8a6", "#fecdd3"],["#8b5cf6", "#22c55e", "#fdba74"],["#06b6d4", "#be123c", "#fef08a"],
+      ["#ca8a04", "#4338ca", "#a7f3d0"],["#f97316", "#0f766e", "#c7d2fe"],["#3b82f6", "#84cc16", "#fbcfe8"],["#ec4899", "#0369a1", "#d9f99d"],
+      ["#ef4444", "#10b981", "#e9d5ff"],["#7c3aed", "#eab308", "#bae6fd"]
     ];
-
     const SECTION_SIZES = [4, 6, 4];
     const TOTAL_LIVES = 5;
-
-    let deck = [];
-    let phase = "preview";
-    let matchedIds = new Set();
-    let selectedIndex = null;
-    let lives = TOTAL_LIVES;
-    let message = "Study the board. Tap any circle when you're ready to begin.";
-
-    const boardEl = document.getElementById("board");
-    const heartsEl = document.getElementById("hearts");
-    const pairsFoundEl = document.getElementById("pairsFound");
-    const statusTextEl = document.getElementById("statusText");
-    const targetBoxEl = document.getElementById("targetBox");
-    const newGameBtn = document.getElementById("newGameBtn");
-
-    function shuffle(array) {
-      const copy = [...array];
-      for (let i = copy.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
+    const TOTAL_TIME = 120;
+    const HIGH_SCORE_KEY = "memory-rings-high-scores";
+    const HIGH_SCORE_LIMIT = 5;
+    const state = {deck:[],phase:"ready",matchedIds:new Set(),selectedIndex:null,lives:TOTAL_LIVES,timeRemaining:TOTAL_TIME,message:"Press Start Game to reveal the board and begin the 120-second timer.",finalScore:null,highScores:[],deadline:null,timerId:null};
+    const boardEl = document.getElementById("board"), livesEl = document.getElementById("lives"), timeValueEl = document.getElementById("timeValue"), pairsValueEl = document.getElementById("pairsValue"), scoreValueEl = document.getElementById("scoreValue"), messageEl = document.getElementById("message"), targetBoxEl = document.getElementById("targetBox"), scoreListEl = document.getElementById("scoreList"), progressBarEl = document.getElementById("progressBar"), timerPercentEl = document.getElementById("timerPercent"), startButtonEl = document.getElementById("startButton"), newButtonEl = document.getElementById("newButton"), clearScoresButtonEl = document.getElementById("clearScoresButton");
+    function shuffle(array){const copy=[...array];for(let i=copy.length-1;i>0;i-=1){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]}return copy}
+    function buildDeck(){return shuffle(PATTERNS.flatMap((colors,pairId)=>[{id:`${pairId}-a`,pairId,colors},{id:`${pairId}-b`,pairId,colors}]))}
+    function formatTime(seconds){const mins=Math.floor(seconds/60), secs=seconds%60; return `${mins}:${String(secs).padStart(2,"0")}`}
+    function computeScore(timeRemaining=state.timeRemaining,lives=state.lives){const livesLost=TOTAL_LIVES-lives;return Math.round((1000*timeRemaining/TOTAL_TIME)-(50*livesLost))}
+    function loadHighScores(){try{const raw=localStorage.getItem(HIGH_SCORE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[]}catch{return[]}}
+    function saveHighScores(scores){try{localStorage.setItem(HIGH_SCORE_KEY,JSON.stringify(scores))}catch{}}
+    function getSectionIndices(){let cursor=0;return SECTION_SIZES.map((size,index)=>({title:`Section ${index+1}`,top:Array.from({length:size},()=>cursor++),bottom:Array.from({length:size},()=>cursor++)}))}
+    function createCircle(colors){const circle=document.createElement("div");circle.className="circle";const outer=document.createElement("div"),middle=document.createElement("div"),inner=document.createElement("div");outer.className="ring-outer";middle.className="ring-middle";inner.className="ring-inner";outer.style.backgroundColor=colors[0];middle.style.backgroundColor=colors[1];inner.style.backgroundColor=colors[2];circle.append(outer,middle,inner);return circle}
+    function createHiddenRing(selected){const hidden=document.createElement("div");hidden.className="hidden-ring";if(selected){hidden.style.borderColor="rgba(255,255,255,.72)";hidden.style.boxShadow="0 0 0 3px rgba(255,255,255,.08)"}return hidden}
+    function stopTimer(){if(state.timerId){clearInterval(state.timerId);state.timerId=null}}
+    function startTimer(){stopTimer();state.deadline=Date.now()+(state.timeRemaining*1000);state.timerId=setInterval(()=>{const next=Math.max(0,Math.ceil((state.deadline-Date.now())/1000));if(next!==state.timeRemaining){state.timeRemaining=next;updateStats()}if(next<=0){stopTimer();if(state.phase==="preview"||state.phase==="playing"){state.timeRemaining=0;state.finalScore=computeScore(0,state.lives);state.phase="lost";state.selectedIndex=null;state.message="Time's up. Start a new game to try again.";saveResultIfNeeded();render()}}},250)}
+    function resetRunState(nextDeck){stopTimer();state.deck=nextDeck;state.phase="ready";state.matchedIds=new Set();state.selectedIndex=null;state.lives=TOTAL_LIVES;state.timeRemaining=TOTAL_TIME;state.message="Press Start Game to reveal the board and begin the 120-second timer.";state.finalScore=null;state.deadline=null}
+    function saveResultIfNeeded(){if(state.finalScore===null||(state.phase!=="won"&&state.phase!=="lost")) return; const candidate={score:state.finalScore,result:state.phase==="won"?"Win":"Loss",livesLost:TOTAL_LIVES-state.lives,timeRemaining:state.timeRemaining,timestamp:Date.now()};const exists=state.highScores.some(entry=>entry.score===candidate.score&&entry.result===candidate.result&&entry.livesLost===candidate.livesLost&&entry.timeRemaining===candidate.timeRemaining&&Math.abs(entry.timestamp-candidate.timestamp)<1000); if(exists)return; state.highScores=[...state.highScores,candidate].sort((a,b)=>(b.score-a.score)||(b.timeRemaining-a.timeRemaining)).slice(0,HIGH_SCORE_LIMIT); saveHighScores(state.highScores)}
+    function startGame(){resetRunState(buildDeck());state.phase="preview";state.message="Board revealed. Memorize the patterns, then click any circle to choose your target.";startTimer();render()}
+    function newGame(){resetRunState(buildDeck());render()}
+    function clearHighScores(){state.highScores=[];saveHighScores([]);renderHighScores()}
+    function handleCircleClick(deckIndex){
+      const clicked=state.deck[deckIndex]; if(!clicked||state.matchedIds.has(clicked.id)||state.phase==="ready"||state.phase==="won"||state.phase==="lost") return;
+      if(state.phase==="preview"){state.phase="playing";state.selectedIndex=deckIndex;state.message="Now match that pattern from memory.";render();return}
+      if(state.selectedIndex===null){state.selectedIndex=deckIndex;state.message="Find the matching circle.";render();return}
+      if(deckIndex===state.selectedIndex) return;
+      const selected=state.deck[state.selectedIndex], isMatch=selected.pairId===clicked.pairId;
+      if(isMatch){
+        state.matchedIds.add(selected.id); state.matchedIds.add(clicked.id); state.selectedIndex=null;
+        if(state.matchedIds.size===state.deck.length){stopTimer();state.finalScore=computeScore();state.phase="won";state.message="Perfect memory. You matched all 14 pairs.";saveResultIfNeeded()} else {state.message="Match found. Pick another hidden circle."}
+        render(); return;
       }
-      return copy;
+      state.lives-=1; state.selectedIndex=null;
+      if(state.lives>0){state.phase="preview";state.message="Wrong match. The board reset, but your completed matches stay cleared. The timer is still running."}
+      else {stopTimer();state.finalScore=computeScore(state.timeRemaining,state.lives);state.phase="lost";state.message="No lives left. Start a new game to try again.";saveResultIfNeeded()}
+      render();
     }
-
-    function buildDeck() {
-      return shuffle(
-        PATTERNS.flatMap((colors, pairId) => [
-          { id: `${pairId}-a`, pairId, colors },
-          { id: `${pairId}-b`, pairId, colors },
-        ])
-      );
+    function renderBoard(){
+      boardEl.innerHTML=""; const sections=getSectionIndices();
+      sections.forEach((section,idx)=>{
+        const sectionEl=document.createElement("div"); sectionEl.className="section";
+        const title=document.createElement("div"); title.className="section-title"; title.textContent=section.title; sectionEl.appendChild(title);
+        const content=document.createElement("div"); content.className="section-content";
+        [["Top",section.top],["Bottom",section.bottom]].forEach(([rowLabel,indices])=>{
+          const rowWrap=document.createElement("div"); rowWrap.className="row-wrap";
+          const rowTitle=document.createElement("div"); rowTitle.className="tiny-label"; rowTitle.textContent=rowLabel; rowWrap.appendChild(rowTitle);
+          const row=document.createElement("div"); row.className="row"; row.style.gridTemplateColumns=`repeat(${indices.length}, minmax(0, 1fr))`;
+          indices.forEach((deckIndex)=>{
+            const card=state.deck[deckIndex], matched=state.matchedIds.has(card.id), hidden=(state.phase==="ready"||state.phase==="playing")&&!matched, selected=state.phase==="playing"&&state.selectedIndex!==null&&state.deck[state.selectedIndex].id===card.id;
+            const button=document.createElement("button"); button.className="circle-btn"+(selected?" selected":""); button.disabled=matched||state.phase==="ready"||state.phase==="won"||state.phase==="lost"; button.addEventListener("click",()=>handleCircleClick(deckIndex));
+            if(matched){const spacer=document.createElement("div"); spacer.className="circle-space"; button.appendChild(spacer)} else if(hidden){button.appendChild(createHiddenRing(selected))} else {button.appendChild(createCircle(card.colors))}
+            row.appendChild(button);
+          });
+          rowWrap.appendChild(row); content.appendChild(rowWrap);
+        });
+        sectionEl.appendChild(content); boardEl.appendChild(sectionEl);
+        if(idx<sections.length-1){const divider=document.createElement("div"); divider.className="divider"; boardEl.appendChild(divider)}
+      })
     }
-
-    function getSections() {
-      let cursor = 0;
-      return SECTION_SIZES.map((size, sectionIndex) => {
-        const topIndices = Array.from({ length: size }, () => cursor++);
-        const bottomIndices = Array.from({ length: size }, () => cursor++);
-        return { title: `Section ${sectionIndex + 1}`, topIndices, bottomIndices };
-      });
+    function renderLives(){livesEl.innerHTML=""; for(let i=0;i<TOTAL_LIVES;i+=1){const heart=document.createElement("div"); heart.className="heart"+(i<state.lives?" active":""); heart.textContent="♥"; heart.style.color=i<state.lives?"var(--danger)":"rgba(255,255,255,.20)"; livesEl.appendChild(heart)}}
+    function renderTarget(){
+      targetBoxEl.innerHTML="";
+      if(state.phase==="playing"&&state.selectedIndex!==null){targetBoxEl.appendChild(createCircle(state.deck[state.selectedIndex].colors)); return}
+      const wrap=document.createElement("div");
+      wrap.innerHTML = state.phase==="won" ? `<div class="big">All matched</div><div class="small">Final score: ${state.finalScore}</div>` :
+                       state.phase==="lost" ? `<div class="big">Run over</div><div class="small">Final score: ${state.finalScore}</div>` :
+                       state.phase==="preview" ? `<div class="big">Preview mode</div><div class="small">Memorize the board, then click any circle to choose your target.</div>` :
+                       `<div class="big">Ready to start</div><div class="small">Press Start Game to reveal the board and begin the timer.</div>`;
+      targetBoxEl.appendChild(wrap);
     }
-
-    function circleHTML(card, isHidden, isRemoved, isSelected) {
-      if (isRemoved) {
-        return `<div class="removed"></div>`;
-      }
-      if (isHidden) {
-        return `<div class="hidden-ring ${isSelected ? "selected" : ""}"></div>`;
-      }
-      return `
-        <div class="ring">
-          <div class="outer" style="background:${card.colors[0]}"></div>
-          <div class="mid" style="background:${card.colors[1]}"></div>
-          <div class="inner" style="background:${card.colors[2]}"></div>
-        </div>
-      `;
+    function renderHighScores(){
+      scoreListEl.innerHTML="";
+      if(!state.highScores.length){const empty=document.createElement("div"); empty.className="empty"; empty.textContent="No high scores yet."; scoreListEl.appendChild(empty); return}
+      const list=document.createElement("div"); list.className="score-list";
+      state.highScores.forEach((entry,index)=>{const row=document.createElement("div"); row.className="score-row"; row.innerHTML=`<div style="display:flex;align-items:center;gap:12px"><div class="score-rank mono">${index+1}</div><div><div class="score-main mono">${entry.score}</div><div class="score-sub">${entry.result} • ${formatTime(entry.timeRemaining)} left • ${entry.livesLost} lives lost</div></div></div>`; list.appendChild(row)});
+      scoreListEl.appendChild(list);
     }
-
-    function renderBoard() {
-      const sections = getSections();
-      boardEl.innerHTML = sections.map((section, sectionIndex) => {
-        const renderRow = (indices, label) => `
-          <div>
-            <div class="row-label">${label}</div>
-            <div class="circle-grid" style="grid-template-columns: repeat(${indices.length}, minmax(0, 1fr));">
-              ${indices.map(deckIndex => {
-                const card = deck[deckIndex];
-                const matched = matchedIds.has(card.id);
-                const hidden = phase === "playing" && !matched;
-                const selected = selectedIndex !== null && deck[selectedIndex] && deck[selectedIndex].id === card.id;
-                return `
-                  <button class="circle-btn" data-index="${deckIndex}" ${matched || phase === "won" || phase === "lost" ? "disabled" : ""} aria-label="Circle ${deckIndex + 1}">
-                    ${circleHTML(card, hidden, matched, phase === "playing" && selected)}
-                  </button>
-                `;
-              }).join("")}
-            </div>
-          </div>
-        `;
-        return `
-          <div class="section">
-            <div class="section-title">${section.title}</div>
-            <div class="rows">
-              ${renderRow(section.topIndices, "Top")}
-              ${renderRow(section.bottomIndices, "Bottom")}
-            </div>
-          </div>
-          ${sectionIndex < sections.length - 1 ? '<div class="divider"></div>' : ''}
-        `;
-      }).join("");
-
-      boardEl.querySelectorAll(".circle-btn").forEach(btn => {
-        btn.addEventListener("click", () => handleCircleClick(Number(btn.dataset.index)));
-      });
+    function updateStats(){
+      const pairsFound=state.matchedIds.size/2, displayedScore=state.finalScore ?? computeScore(), timerProgress=Math.max(0,Math.min(100,(state.timeRemaining/TOTAL_TIME)*100));
+      renderLives(); timeValueEl.textContent=formatTime(state.timeRemaining); pairsValueEl.textContent=`${pairsFound}/14`; scoreValueEl.textContent=displayedScore; messageEl.textContent=state.message; progressBarEl.style.width=`${timerProgress}%`; timerPercentEl.textContent=`${Math.round(timerProgress)}%`; startButtonEl.disabled=state.phase==="preview"||state.phase==="playing";
     }
-
-    function renderHearts() {
-      heartsEl.innerHTML = Array.from({ length: TOTAL_LIVES }, (_, i) =>
-        `<span class="heart ${i < lives ? "" : "off"}">${i < lives ? "♥" : "♡"}</span>`
-      ).join("");
-    }
-
-    function renderTarget() {
-      const selectedCard = selectedIndex !== null ? deck[selectedIndex] : null;
-
-      if (phase === "playing" && selectedCard) {
-        targetBoxEl.innerHTML = circleHTML(selectedCard, false, false, false);
-        return;
-      }
-      if (phase === "won") {
-        targetBoxEl.innerHTML = `<div><div style="font-size:18px;font-weight:600;color:#e2e8f0">All matched</div><div style="margin-top:6px;font-size:14px;color:rgba(248,250,252,.5)">You cleared the board.</div></div>`;
-        return;
-      }
-      if (phase === "lost") {
-        targetBoxEl.innerHTML = `<div><div style="font-size:18px;font-weight:600;color:#e2e8f0">Game over</div><div style="margin-top:6px;font-size:14px;color:rgba(248,250,252,.5)">Start a new game to try again.</div></div>`;
-        return;
-      }
-      targetBoxEl.innerHTML = `<div><div style="font-size:18px;font-weight:600;color:#e2e8f0">Preview mode</div><div style="margin-top:6px;font-size:14px;color:rgba(248,250,252,.5)">Memorize the board, then tap a circle to begin.</div></div>`;
-    }
-
-    function renderUI() {
-      renderBoard();
-      renderHearts();
-      pairsFoundEl.textContent = String(matchedIds.size / 2);
-      statusTextEl.textContent = message;
-      renderTarget();
-    }
-
-    function resetBoardState(nextLives) {
-      selectedIndex = null;
-      if (nextLives > 0) {
-        phase = "preview";
-        message = "Wrong match. The board reset, but your completed matches stay cleared. Study the remaining circles and try again.";
-      } else {
-        phase = "lost";
-        message = "No lives left. Start a new game to try again.";
-      }
-    }
-
-    function startFreshGame() {
-      deck = buildDeck();
-      phase = "preview";
-      matchedIds = new Set();
-      selectedIndex = null;
-      lives = TOTAL_LIVES;
-      message = "Study the board. Tap any circle when you're ready to begin.";
-      renderUI();
-    }
-
-    function handleCircleClick(deckIndex) {
-      const clicked = deck[deckIndex];
-      if (!clicked) return;
-      if (matchedIds.has(clicked.id)) return;
-      if (phase === "won" || phase === "lost") return;
-
-      if (phase === "preview") {
-        phase = "playing";
-        selectedIndex = deckIndex;
-        message = "Now match that pattern from memory.";
-        renderUI();
-        return;
-      }
-
-      if (selectedIndex === null) {
-        selectedIndex = deckIndex;
-        message = "Find the matching circle.";
-        renderUI();
-        return;
-      }
-
-      if (deckIndex === selectedIndex) return;
-
-      const selected = deck[selectedIndex];
-      const isMatch = selected.pairId === clicked.pairId;
-
-      if (isMatch) {
-        matchedIds.add(selected.id);
-        matchedIds.add(clicked.id);
-        selectedIndex = null;
-
-        if (matchedIds.size === deck.length) {
-          phase = "won";
-          message = "Perfect memory. You matched all 14 pairs.";
-        } else {
-          message = "Match found. Pick another hidden circle.";
-        }
-        renderUI();
-        return;
-      }
-
-      lives -= 1;
-      resetBoardState(lives);
-      renderUI();
-    }
-
-    newGameBtn.addEventListener("click", startFreshGame);
-
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch(() => {});
-      });
-    }
-
-    startFreshGame();
+    function render(){updateStats(); renderBoard(); renderTarget(); renderHighScores()}
+    startButtonEl.addEventListener("click",startGame); newButtonEl.addEventListener("click",newGame); clearScoresButtonEl.addEventListener("click",clearHighScores);
+    state.highScores=loadHighScores(); resetRunState(buildDeck()); render();
+    if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("./sw.js").catch(()=>{})})}
   </script>
 </body>
 </html>
